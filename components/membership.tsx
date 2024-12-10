@@ -1,71 +1,52 @@
-import React, { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { createClient } from "@/supabase/clients/createClient";
+import React from "react";
 import { createServerClient } from "@/supabase/clients/createServer";
-
-type Shop = {
-  id: number;
-  name: string;
-};
+import Image from "next/image";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { ShoppingBag, Users } from "lucide-react";
+import ShopCard from "./shop-card";
 
 const Membership = async () => {
   const supabase = createServerClient();
-  const { data: shops } = await supabase
-    .from("shops")
-    .select("id, name, acronym")
-    .returns<Shop[]>();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  const verify = async (formData: FormData) => {
-    "use server";
-
-    const supabase = createServerClient();
-    const organization = formData.get("organization");
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    const { data, error: selectError } = await supabase
-      .from("membership_requests")
-      .select()
-      .eq("user_id", user?.id)
-      .eq("shop_id", organization)
-      .single();
-
-    if (data == null) {
-      const { error: memError } = await supabase
-        .from("membership_requests")
-        .insert([{ user_id: user?.id, shop_id: organization }]);
-    }
-  };
+  const { data: memberships, error } = await supabase
+    .from("memberships")
+    .select("shops(id, logo_url, acronym, name)")
+    .eq("email", user?.email);
 
   return (
-    <form action={verify} className="space-y-4">
-      <div>
-        <Label htmlFor="organization">Organization</Label>
-        <Select name="organization" required>
-          <SelectTrigger id="organization">
-            <SelectValue placeholder="Select a college..." />
-          </SelectTrigger>
-          <SelectContent>
-            {shops?.map((shop) => (
-              <SelectItem key={shop.id} value={shop.id.toString()}>
-                {shop.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+    <div className="container mx-auto space-y-6 p-4">
+      <div className="flex items-center space-x-3">
+        <Users className="h-8 w-8 text-primary" />
+        <h1 className="text-2xl font-bold">My Memberships</h1>
       </div>
-      <Button type="submit" className="w-full">
-        Verify
-      </Button>
-    </form>
+
+      {error && (
+        <div className="rounded-md border border-red-200 bg-red-50 p-4">
+          <p className="text-red-600">
+            Error loading memberships: {error.message}
+          </p>
+        </div>
+      )}
+
+      {memberships && memberships.length === 0 && (
+        <div className="rounded-md bg-gray-50 py-12 text-center">
+          <ShoppingBag className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+          <p className="text-muted-foreground">
+            You don't have any active memberships yet.
+          </p>
+        </div>
+      )}
+
+      <div className="flex flex-col">
+        {memberships?.map((membership) => {
+          const shop = membership.shops;
+          return <ShopCard shop={shop} key={shop?.id} />;
+        })}
+      </div>
+    </div>
   );
 };
 

@@ -28,6 +28,7 @@ import { createClient } from "@/supabase/clients/createClient";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { revalidatePath } from "next/cache";
 
 interface MerchFormProps {
   merch?: FetchedMerch;
@@ -230,6 +231,7 @@ const ModifyMerch: React.FC<MerchFormProps> = ({
         throw merch_error;
       }
       router.push(`/manage-shop/${shopId}`);
+      router.refresh();
       toast.success("Merchandise saved successfully");
     } catch (error) {
       console.error("Error in merchandise submission:", error);
