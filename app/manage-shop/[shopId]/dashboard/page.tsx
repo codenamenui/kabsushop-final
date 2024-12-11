@@ -116,8 +116,74 @@ async function processOrders(shopId: string) {
   return groupOrders(orders);
 }
 
+type Order = {
+  id: string;
+  created_at: string;
+  merch_id: string;
+  quantity: number;
+  price: number;
+  profiles: {
+    colleges: {
+      id: string;
+      name: string;
+    };
+  } | null;
+  merchandises: {
+    id: string;
+    name: string;
+    merchandise_categories: {
+      categories: {
+        id: string;
+        name: string;
+      };
+    };
+  } | null;
+  order_statuses: {
+    id: string;
+    paid: boolean;
+    received: boolean;
+    received_at: string | null;
+    cancelled: boolean;
+    cancelled_at: string | null;
+    cancel_reason: string | null;
+  } | null;
+};
+
+// Type for the query result
+type OrderQueryResult = {
+  data: Order[] | null;
+  error: Error | null;
+};
+
+type GroupedOrders = {
+  byCollege: Record<
+    string,
+    {
+      totalOrders: number;
+      totalQuantity: number;
+      orders: Order[];
+    }
+  >;
+  byMerchId: Record<
+    string,
+    {
+      totalOrders: number;
+      totalQuantity: number;
+      orders: Order[];
+    }
+  >;
+  byOrderStatus: Record<
+    string,
+    {
+      totalOrders: number;
+      totalQuantity: number;
+      orders: Order[];
+    }
+  >;
+};
+
 const Dashboard = ({ params }: { params: { shopId: string } }) => {
-  const [orders, setOrders] = useState({});
+  const [orders, setOrders] = useState<GroupedOrders>();
   useEffect(() => {
     const getData = async () => {
       const orders = await processOrders(params.shopId);
