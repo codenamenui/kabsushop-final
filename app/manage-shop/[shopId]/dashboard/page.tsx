@@ -1,31 +1,101 @@
-import { Orders } from "@/constants/type";
-import { createServerClient } from "@/supabase/clients/createServer";
-import React from "react";
-import OrderAnalyticsDashboard from "./graph";
+"use client";
 
-const Dashboard = async ({ params }: { params: { shopId: string } }) => {
-  const supabase = createServerClient();
-  const { data: orders, error } = await supabase
-    .from("orders")
-    .select(
-      `
+import { createClient } from "@/supabase/clients/createClient";
+import { useEffect, useState } from "react";
+
+function groupOrders(orders) {
+  // Initialize result objects for different groupings
+  const groupedByCollege = {};
+  const groupedByMerchId = {};
+  const groupedByOrderStatus = {};
+
+  orders.forEach((order) => {
+    // Group by College Name and count quantities
+    if (order.profiles?.colleges?.name) {
+      const collegeName = order.profiles.colleges.name;
+
+      // Initialize college entry if not exists
+      if (!groupedByCollege[collegeName]) {
+        groupedByCollege[collegeName] = {
+          totalOrders: 0,
+          totalQuantity: 0,
+          orders: [],
+        };
+      }
+
+      // Increment total orders and quantities
+      groupedByCollege[collegeName].totalOrders++;
+      groupedByCollege[collegeName].totalQuantity += order.quantity || 0;
+      groupedByCollege[collegeName].orders.push(order);
+    }
+
+    // Group by Merch ID and count quantities
+    if (order.merch_id) {
+      if (!groupedByMerchId[order.merch_id]) {
+        groupedByMerchId[order.merch_id] = {
+          totalOrders: 0,
+          totalQuantity: 0,
+          orders: [],
+        };
+      }
+
+      groupedByMerchId[order.merch_id].totalOrders++;
+      groupedByMerchId[order.merch_id].totalQuantity += order.quantity || 0;
+      groupedByMerchId[order.merch_id].orders.push(order);
+    }
+
+    // Group by Order Status and count quantities
+    const status = getOrderStatus(order);
+    if (!groupedByOrderStatus[status]) {
+      groupedByOrderStatus[status] = {
+        totalOrders: 0,
+        totalQuantity: 0,
+        orders: [],
+      };
+    }
+
+    groupedByOrderStatus[status].totalOrders++;
+    groupedByOrderStatus[status].totalQuantity += order.quantity || 0;
+    groupedByOrderStatus[status].orders.push(order);
+  });
+
+  return {
+    byCollege: groupedByCollege,
+    byMerchId: groupedByMerchId,
+    byOrderStatus: groupedByOrderStatus,
+  };
+}
+
+// Helper function to determine order status
+function getOrderStatus(order) {
+  if (order.order_statuses?.cancelled) return "Cancelled";
+  if (order.order_statuses?.received) return "Received";
+  if (order.order_statuses?.paid) return "Paid";
+  return "Pending";
+}
+
+// Process orders with comprehensive query
+async function processOrders(shopId: string) {
+  const supabase = createClient();
+  const { data: orders, error } = await supabase.from("orders").select(
+    `
       id, 
+      created_at, 
+      merch_id, 
       quantity, 
-      price, 
-      variants(id, name), 
-      merchandises(name, merchandise_pictures(picture_url)), 
-      profiles(
-        student_number, 
-        first_name, 
-        last_name, 
-        email, 
-        contact_number,
-        section,
-        year,
-        colleges(name), 
-        programs(name)
-      ), 
-      order_statuses(
+      price,
+      profiles(colleges(id, name)),
+      merchandises (
+        id,
+        name,
+        merchandise_categories (
+          categories (
+            id,
+            name
+          )
+        )
+      ),
+      order_statuses (
         id,
         paid, 
         received, 
@@ -35,14 +105,29 @@ const Dashboard = async ({ params }: { params: { shopId: string } }) => {
         cancel_reason
       )
     `,
-    )
-    .eq("shop_id", params.shopId)
-    .returns<Orders[]>();
-  return (
-    <div>
-      <OrderAnalyticsDashboard ini={orders ?? []} />
-    </div>
   );
+  // .eq("shop_id", shopId);
+
+  if (error) {
+    console.error("Error fetching orders:", error);
+    return null;
+  }
+
+  return groupOrders(orders);
+}
+
+const Dashboard = ({ params }: { params: { shopId: string } }) => {
+  const [orders, setOrders] = useState({});
+  useEffect(() => {
+    const getData = async () => {
+      const orders = await processOrders(params.shopId);
+      console.log(orders);
+      setOrders(orders);
+    };
+    getData();
+  }, []);
+  // console.log(orders);
+  return <div className="container mx-auto p-4"></div>;
 };
 
 export default Dashboard;
