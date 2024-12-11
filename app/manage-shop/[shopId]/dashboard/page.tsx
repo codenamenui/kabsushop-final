@@ -4,59 +4,59 @@ import { createClient } from "@/supabase/clients/createClient";
 import { useEffect, useState } from "react";
 
 function groupOrders(orders) {
-  // Initialize result objects for different groupings
-  const groupedByCollege = {};
-  const groupedByMerchId = {};
-  const groupedByOrderStatus = {};
+  // Initialize result arrays for different groupings
+  const groupedByCollege = [];
+  const groupedByMerchId = [];
+  const groupedByOrderStatus = [];
+
+  // Helper function to find or create an entry in a group array
+  function findOrCreate(group, key, keyName) {
+    let entry = group.find((item) => item[keyName] === key);
+    if (!entry) {
+      entry = { [keyName]: key, quantities: 0, orders: 0, orderDetails: [] };
+      group.push(entry);
+    }
+    return entry;
+  }
 
   orders.forEach((order) => {
     // Group by College Name and count quantities
     if (order.profiles?.colleges?.name) {
       const collegeName = order.profiles.colleges.name;
+      const collegeEntry = findOrCreate(
+        groupedByCollege,
+        collegeName,
+        "college",
+      );
 
-      // Initialize college entry if not exists
-      if (!groupedByCollege[collegeName]) {
-        groupedByCollege[collegeName] = {
-          totalOrders: 0,
-          totalQuantity: 0,
-          orders: [],
-        };
-      }
-
-      // Increment total orders and quantities
-      groupedByCollege[collegeName].totalOrders++;
-      groupedByCollege[collegeName].totalQuantity += order.quantity || 0;
-      groupedByCollege[collegeName].orders.push(order);
+      // Increment totals
+      collegeEntry.orders++;
+      collegeEntry.quantities += order.quantity || 0;
+      collegeEntry.orderDetails.push(order);
     }
 
     // Group by Merch ID and count quantities
     if (order.merch_id) {
-      if (!groupedByMerchId[order.merch_id]) {
-        groupedByMerchId[order.merch_id] = {
-          totalOrders: 0,
-          totalQuantity: 0,
-          orders: [],
-        };
-      }
+      const merchEntry = findOrCreate(
+        groupedByMerchId,
+        order.merch_id,
+        "merch_id",
+      );
 
-      groupedByMerchId[order.merch_id].totalOrders++;
-      groupedByMerchId[order.merch_id].totalQuantity += order.quantity || 0;
-      groupedByMerchId[order.merch_id].orders.push(order);
+      // Increment totals
+      merchEntry.orders++;
+      merchEntry.quantities += order.quantity || 0;
+      merchEntry.orderDetails.push(order);
     }
 
     // Group by Order Status and count quantities
     const status = getOrderStatus(order);
-    if (!groupedByOrderStatus[status]) {
-      groupedByOrderStatus[status] = {
-        totalOrders: 0,
-        totalQuantity: 0,
-        orders: [],
-      };
-    }
+    const statusEntry = findOrCreate(groupedByOrderStatus, status, "status");
 
-    groupedByOrderStatus[status].totalOrders++;
-    groupedByOrderStatus[status].totalQuantity += order.quantity || 0;
-    groupedByOrderStatus[status].orders.push(order);
+    // Increment totals
+    statusEntry.orders++;
+    statusEntry.quantities += order.quantity || 0;
+    statusEntry.orderDetails.push(order);
   });
 
   return {
